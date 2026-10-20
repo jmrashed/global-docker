@@ -1,0 +1,41 @@
+name: global-redis
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    # Password protected (shared ADMIN_PASSWORD), AOF persistence, 512 MB cap.
+    # volatile-lru only evicts keys that have a TTL (cache), so queue/session data without TTL is never dropped.
+    command:
+      - redis-server
+      - --requirepass
+      - ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 512mb
+      - --maxmemory-policy
+      - volatile-lru
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+    environment:
+      REDISCLI_AUTH: ${ADMIN_PASSWORD}
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [global-net]
+
+volumes:
+  redis_data:
+
+networks:
+  global-net:
+    external: true
